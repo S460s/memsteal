@@ -46,7 +46,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
   case ARGP_KEY_ARG:
     if (state->arg_num >= 1)
       argp_usage(state);
-    arguments->search_str= arg;
+    arguments->search_str = arg;
     break;
   case ARGP_KEY_END:
     if (state->arg_num < 1)
@@ -101,7 +101,7 @@ mem_offset *parse_offset(char *map_line) {
   return offset;
 }
 
-void parse_mem(int mem, FILE *maps, int pid) {
+void parse_mem(int mem, FILE *maps, int pid, struct arguments *arguments) {
   size_t line_length = 128;
   int bytes_read = 0;
   char *map_line = NULL;
@@ -115,19 +115,22 @@ void parse_mem(int mem, FILE *maps, int pid) {
     char *data = malloc(size);
     read(mem, data, size);
 
-    char *search_str = "password";
-    unsigned int str_length = strlen(search_str);
-
-    char *match = memmem(data, size, search_str, str_length);
+    unsigned int str_length = strlen(arguments->search_str);
+    char *match = memmem(data, size, arguments->search_str, str_length);
 
     if (match != NULL) {
-      printf("PID: %d\n", pid);
-      printf(ANSI_COLOR_RED);
+      if (arguments->colorful) {
+        printf(ANSI_COLOR_GREEN "PID: %d\n" ANSI_COLOR_RESET, pid);
+        printf(ANSI_COLOR_RED);
+      } else {
+        printf("PID: %d\n", pid);
+      }
+
       for (int i = 0; i < 300; i++) {
         if (isascii(match[i]))
           putchar(match[i]);
         // color only the searched string
-        if (i == str_length)
+        if (i == str_length - 1)
           printf(ANSI_COLOR_RESET);
       }
       putchar('\n');
@@ -141,16 +144,12 @@ void parse_mem(int mem, FILE *maps, int pid) {
 }
 
 int main(int argc, char **argv) {
-
-
   struct arguments arguments;
   arguments.colorful = 0;
   arguments.verbose = 0;
 
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
-  printf("input -> %s \n", arguments.search_str);
 
-  exit(0);
   pid_t current_pid = getpid();
 
   struct dirent *dirent;
@@ -168,18 +167,20 @@ int main(int argc, char **argv) {
 
       FILE *maps = fopen(maps_path, "r");
       if (maps == NULL) {
-        perror("[ERROR] couldn't open maps file");
+        if (arguments.verbose)
+          perror("[ERROR] couldn't open maps file");
         continue;
       }
 
       int mem = open(mem_path, O_RDWR);
       if (mem == -1) {
-        perror("[ERROR] couldn't open mem file");
+        if (arguments.verbose)
+          perror("[ERROR] couldn't open mem file");
         fclose(maps);
         continue;
       }
 
-      parse_mem(mem, maps, pid);
+      parse_mem(mem, maps, pid, &arguments);
 
       fclose(maps);
       close(mem);
