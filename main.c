@@ -6,6 +6,7 @@
 #include <string.h>
 // #define _POSIX_SOURCE -> is that needed? [02:55]
 #include <unistd.h>
+#include <fcntl.h>
 
 int main(int argc, char **argv) {
   pid_t current_pid = getpid();
@@ -32,6 +33,21 @@ int main(int argc, char **argv) {
         continue;
       }
 
+      int mem = open(mem_path, O_RDWR);
+      if(mem == -1){
+        perror("[ERROR] couldn't open maps file");
+        fclose(maps);
+        continue;
+      }
+
+      // FILE *mem = fopen(mem_path, "r");
+      // if (mem == NULL) {
+      //   perror("[ERROR] couldn't open maps file");
+      //   // if maps is readable but mem is not, check if that's possible
+      //   fclose(maps);
+      //   continue;
+      // }
+
       size_t line_length = 128;
       int bytes_read = 0;
       char *map_line = NULL;
@@ -41,19 +57,29 @@ int main(int argc, char **argv) {
         char start_str[16];
         char end_str[16];
 
+        // use strtol directly and pass end_ptr?
         sscanf(map_line, "%12s-%12s", start_str, end_str);
-        // printf("[ADDRESS] %s-%s\n", start_str, end_str);
-
-        // this should be optimizable or put into it's own function
+        printf("[ADDRESS] %s-%s\n", start_str, end_str);
 
         long int start = strtol(start_str, NULL, 16);
         long int end = strtol(end_str, NULL, 16);
+
+        // SEEK_SET or SEEK_CUR?
+        lseek(mem, start, SEEK_SET);
+        int size = end - start;
+        char* data = malloc(size + 1);
+
+        read(mem, data, size);
+        printf("%s \n", data);
+
+        free(data);
 
         printf("%ld-%ld \n", start, end);
       };
 
       free(map_line);
       fclose(maps);
+      // fclose(mem);
     }
   }
 
