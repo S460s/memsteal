@@ -38,11 +38,18 @@ int main(int argc, char **argv) {
 
       while ((bytes_read = getline(&map_line, &line_length, maps)) != -1) {
         // TODO: not sure how to store the start and the end
-        char start[16];
-        char end[16];
+        char start_str[16];
+        char end_str[16];
 
-        sscanf(map_line, "%12s-%12s", start, end);
-        printf("[ADDRESS] %s-%s\n", start, end);
+        sscanf(map_line, "%12s-%12s", start_str, end_str);
+        // printf("[ADDRESS] %s-%s\n", start_str, end_str);
+
+        // this should be optimizable or put into it's own function
+
+        long int start = strtol(start_str, NULL, 16);
+        long int end = strtol(end_str, NULL, 16);
+
+        printf("%ld-%ld \n", start, end);
       };
 
       free(map_line);
