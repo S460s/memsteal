@@ -1,12 +1,15 @@
 #include <dirent.h>
+#define _GNU_SOURCE /* See feature_test_macros(7) */
 #include <signal.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 // #define _POSIX_SOURCE -> is that needed? [02:55]
-#include <unistd.h>
 #include <fcntl.h>
+#include <unistd.h>
+
+const char *looking_for = "PASSWORD";
 
 int main(int argc, char **argv) {
   pid_t current_pid = getpid();
@@ -34,7 +37,7 @@ int main(int argc, char **argv) {
       }
 
       int mem = open(mem_path, O_RDWR);
-      if(mem == -1){
+      if (mem == -1) {
         perror("[ERROR] couldn't open maps file");
         fclose(maps);
         continue;
@@ -66,11 +69,22 @@ int main(int argc, char **argv) {
 
         // SEEK_SET or SEEK_CUR?
         lseek(mem, start, SEEK_SET);
-        int size = end - start;
-        char* data = malloc(size + 1);
+        long int size = end - start;
+       
+        if(size < 0){
+          printf("***SIZE*** %ld\n", size);
+          continue;
+        }
+
+        char *data = malloc(size + 1);
 
         read(mem, data, size);
-        printf("%s \n", data);
+        printf("[%ld] %s \n",size ,data);
+
+        char* match = strstr(data, looking_for);
+        if(match != NULL){
+          printf("[PASSWORD]: %s\n", match);
+        }
 
         free(data);
 
